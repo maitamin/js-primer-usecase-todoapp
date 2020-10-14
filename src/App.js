@@ -6,9 +6,19 @@ import { TodoListView } from "./view/TodoListView.js";
 import { render } from "./view/html-util.js";
 
 export class App {
-    constructor() {
+    constructor({ formElement, formInputElement, todoListContainerElement, todoCountElement }) {
         // console.log("App initialized");
+        this.todoListView = new TodoListView();
         this.todoListModel = new TodoListModel();
+
+        this.formElement = formElement;
+        this.formInputElement = formInputElement;
+        this.todoListContainerElement = todoListContainerElement;
+        this.todoCountElement = todoCountElement;
+        // ハンドラ呼び出しで、`this`が変わらないように固定する
+        // `this`が常に`App`のインスタンスを示すようにする
+        this.handleSubmit = this.handleSubmit.bind(this);
+        this.handleChange = this.handleChange.bind(this);
     }
 
     /**
@@ -35,33 +45,34 @@ export class App {
         this.todoListModel.deleteTodo({ id });
     }
 
+    handleSubmit(event) {
+        event.preventDefault();
+        this.handleAdd(this.formInputElement.value);
+        this.formInputElement.value = "";
+    }
+
+    handleChange() {
+        const todoListElement = this.todoListView.createElement(this.todoListModel.getTotalItems(), {
+            onUpdateTodo: ({ id, completed }) => {
+                this.handleUpdate({ id, completed });
+            },
+            onDeleteTodo: ({ id }) => {
+                this.hnadleDelete({ id });
+            }
+        });
+        render(todoListElement, this.todoListContainerElement);
+        this.todoCountElement.textContent = `Todoアイテム数: ${this.todoListModel.getTotalCount()}`;
+    }
+
     mount() {
-        const formElement = document.querySelector("#js-form");
-        const inputElement = document.querySelector("#js-form-input");
-        const containerElement = document.querySelector("#js-todo-list");
-        const todoItemCountElement = document.querySelector("#js-todo-count");
-        
-        this.todoListModel.onChange(() => {
-            const todoItems = this.todoListModel.getTotalItems();
-            const todoListView = new TodoListView();
-            const todoListElement = todoListView.createElement( todoItems, {
-                onUpdateTodo: ({id, completed }) => {
-                    this.handleUpdate({ id, completed });
-                },
-                onDeleteTodo: ({ id }) => {
-                    this.hnadleDelete({ id });
-                }
-            });
+        console.log("mount");
+        this.todoListModel.onChange(this.handleChange);
+        this.formElement.addEventListener("submit", this.handleSubmit);
+    }
 
-            render(todoListElement, containerElement);
-            todoItemCountElement.textContent = `Todoアイテム数: ${this.todoListModel.getTotalCount()}`;
-        });
-
-        formElement.addEventListener("submit", (event) => {
-            // submitイベントの本来の動作を止める
-            event.preventDefault();
-            this.handleAdd(inputElement.value);
-            inputElement.value = "";
-        });
+    unmount() {
+        console.log("unmount");
+        this.todoListModel.offChange(this.handleChange);
+        this.formElement.removeEventListener("submit", this.handleSubmit);
     }
 }
